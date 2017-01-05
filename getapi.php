@@ -35,6 +35,7 @@ function accessCode(){
 
 function refreshToken(){
     global $jssdk;
+    $jssdk->removeRecord();
     $res['token'] = $jssdk->getAccessToken();
     $res['js'] = $jssdk->getJsApiTicket();
     if($res){

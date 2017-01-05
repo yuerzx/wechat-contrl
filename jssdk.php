@@ -150,16 +150,38 @@ class JSSDK
         }
     }
 
-    private function get_php_file($filename)
-    {
-        return trim(substr(file_get_contents($filename), 15));
-    }
+    public function removeRecord(){
+        $this->wpdb->update(
+            $this->database,
+            array(
+                'access_value' => $this->currentToken,
+                'exp_time' => time() - 50
+            ),
+            array('access_key' => 'accessToken'),
+            array(
+                '%s',
+                '%d'
+            ),
+            array(
+                '%s'
+            )
+        );
 
-    private function set_php_file($filename, $content)
-    {
-        $fp = fopen($filename, "w");
-        fwrite($fp, "<?php exit();?>" . $content);
-        fclose($fp);
+        $this->wpdb->update(
+            $this->database,
+            array(
+                'access_value' => $this->currentJsAPI,
+                'exp_time' => time() - 50
+            ),
+            array('access_key' => 'jsAPI'),
+            array(
+                '%s',
+                '%d'
+            ),
+            array(
+                '%s'
+            )
+        );
     }
 }
 
