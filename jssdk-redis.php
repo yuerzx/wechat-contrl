@@ -1,6 +1,6 @@
 <?php
 
-class JSSDK
+class JSSDK_Redis
 {
     private $appId;
     private $appSecret;
@@ -9,11 +9,10 @@ class JSSDK
 
     public function __construct($appId, $appSecret)
     {
-        global $wpdb;
-        $this->wpdb = $wpdb;
+        global $redis;
+        $this->redis = $redis;
         $this->appId = $appId;
         $this->appSecret = $appSecret;
-        $this->database = $this->wpdb->prefix . 'oneuni_wechat_access';
         $this->currentToken;
         $this->currentJsAPI;
     }
@@ -55,12 +54,11 @@ class JSSDK
     public function getJsApiTicket()
     {
 
-        $jsapi_token = $this->wpdb->get_row("SELECT access_key, access_value, exp_time FROM $this->database WHERE access_key = 'jsAPI'", ARRAY_A);
+        $jsapi_token = $this->redis->exists('wx-jsAPI');
 
         //if the ticket has been expired
-        if ($jsapi_token['exp_time'] < time()) {
+        if (!$jsapi_token) {
             $url = "https://api.weixin.qq.com/cgi-bin/ticket/getticket?type=jsapi&access_token=$this->currentToken";
-            var_dump("JSAPI" + $url);
             $res = json_decode($this->httpGet($url));
 
             //if we successfully load the information from server
@@ -68,25 +66,11 @@ class JSSDK
                 $this->currentJsAPI = $res->ticket;
                 //time to update the database
                 if ($res) {
-                    $this->wpdb->update(
-                        $this->database,
-                        array(
-                            'access_value' => $this->currentJsAPI,
-                            'exp_time' => time() + 3000
-                        ),
-                        array('access_key' => 'jsAPI'),
-                        array(
-                            '%s',
-                            '%d'
-                        ),
-                        array(
-                            '%s'
-                        )
-                    );
+                    $this->redis->setex('wx-jsAPI', 3000, $this->currentJsAPI);
                 }
             }
         } else {
-            $this->currentJsAPI = $jsapi_token['access_value'];
+            $this->currentJsAPI = $this->redis->get('wx-jsAPI');
         }
 
         return $this->currentJsAPI;
@@ -95,36 +79,18 @@ class JSSDK
     public function getAccessToken()
     {
         // access_token 应该全局存储与更新，以下代码以写入到文件中做示例
-        $access_token = $this->wpdb->get_row("SELECT access_key, access_value, exp_time FROM $this->database WHERE access_key = 'accessToken'", ARRAY_A);
+        $access_token = $this->redis->exists('wx-accessToken');
 
-        if (time() > $access_token['exp_time']) {
+        if (!$access_token) {
             $url = "https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=$this->appId&secret=$this->appSecret";
             $res = json_decode($this->httpGet($url));
             if ($res) {
                 $this->currentToken = $res->access_token;
-                if ($access_token) {
-                    $this->wpdb->update(
-                        $this->database,
-                        array(
-                            'access_value' => $this->currentToken,
-                            'exp_time' => time() + 3000
-                        ),
-                        array('access_key' => 'accessToken'),
-                        array(
-                            '%s',
-                            '%d'
-                        ),
-                        array(
-                            '%s'
-                        )
-                    );
-                }
+                $this->redis -> setex("wx-accessToken", 3000, $this->currentToken);
             }
         } else {
-            $this->currentToken = $access_token['access_value'];
+            $this->currentToken = $this->redis->get('wx-accessToken');
         }
-
-
         return $this->currentToken;
     }
 
@@ -149,37 +115,7 @@ class JSSDK
     }
 
     public function removeRecord(){
-        $this->wpdb->update(
-            $this->database,
-            array(
-                'access_value' => $this->currentToken,
-                'exp_time' => time() - 50
-            ),
-            array('access_key' => 'accessToken'),
-            array(
-                '%s',
-                '%d'
-            ),
-            array(
-                '%s'
-            )
-        );
-
-        $this->wpdb->update(
-            $this->database,
-            array(
-                'access_value' => $this->currentJsAPI,
-                'exp_time' => time() - 50
-            ),
-            array('access_key' => 'jsAPI'),
-            array(
-                '%s',
-                '%d'
-            ),
-            array(
-                '%s'
-            )
-        );
+       $this->redis->delete('wx-accessToken', 'wx-jsAPI');
     }
 }
 
