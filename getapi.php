@@ -10,8 +10,8 @@ require "functions.php";
 require "jssdk-mysql.php";
 require "jssdk-redis.php";
 
-$app_key = "wx2d39a6c422ad663c";
-$app_pass = "e339b975f47c4a16b2b4b41f10fb5ef1";
+$app_key = "wxe7ac3f4149cec104";
+$app_pass = "Change here";
 
 global $redis;
 $redis = new Redis();
